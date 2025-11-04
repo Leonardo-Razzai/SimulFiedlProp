@@ -9,8 +9,8 @@ import pandas as pd
 
 from LP_projection_functions import (
     get_guided_modes,
-    gaussian_electric_field,
     get_LP_modes_projection_coefficients,
+    get_tilted_beam_from_incidence,
 )
 
 # --------------------------------------- PARAMETERS ----------------------------------------------
@@ -21,15 +21,17 @@ from LP_projection_functions import (
 FIBER_V = 6.3
 MODES_TO_TEST = [(0, 1), (0, 2), (1, 1), (1, 2), (2, 1), (3, 1)]
 
-# --- Injected field parameters ---#
-LAMBDA = 0.044
-E_IN_Z = 0
-W0_X = 0.8
-W0_Y = 1.1
-X0 = 0
-Y0 = -0.2
-THETA = np.pi / 9
-POLARIZATION_ANGLE = 0
+# --- Injected field parameters ---
+LAMBDA = 0.044                  # Wavelength of the injected beam
+DIST_TO_WAIST = 5               # Distance from the beam waist to the fiber input plane
+W0_X = 1                        # Beam waist size along the x-axis
+W0_Y = 1                        # Beam waist size along the y-axis
+X0 = 0.2                        # x-coordinate of the beam's incidence point on the fiber input plane
+Y0 = -0.2                       # y-coordinate of the beam's incidence point on the fiber input plane
+ROLL_ANGLE = 0 * np.pi / 180    # Roll angle of the beam (rotation about the z-axis, in radians)
+PITCH_ANGLE = 1 * np.pi / 180   # Pitch angle of the beam (tilt in the x-z plane, in radians)
+YAW_ANGLE = 0.5 * np.pi / 180   # Yaw angle of the beam (tilt in the y-z plane, in radians)
+POLARIZATION_ANGLE = np.pi/4    # Polarization angle of the beam (angle of the electric field vector, in radians)
 
 # --- Grid stuff ---
 AXIS_SIZE = 1.5
@@ -37,17 +39,29 @@ GRID_SIZE = 500
 
 # --- Visualization stuff ---
 # Colormap name passed to matplotlib for the power density plots
-CMAP = "gnuplot2"
+# First parameter is the color map name ("gnuplot2" recommanded),
+# secod parameter is the number of color
+CMAP = plt.get_cmap('gnuplot2', 15)
 
-# If True, use a common color scale (same vmax) for input field and guided field plots 
+# If True, use a common color scale (same vmax) for input field and guided field plots
 # to allow direct visual comparison. If False, each plot scales independently.
-NORMALIZE_COLOR_PALETTE = False
+NORMALIZE_COLOR_PALETTE = True
 
 # -------------------------------------------------------------------------------------------------
 # -------------------------------------------------------------------------------------------------
+
 
 # --- Fiber radius ---
 radius = 1.0
+
+# --- Some stuff on angles ---
+NA = LAMBDA * FIBER_V / (2 * np.pi * radius)
+total_tilt = np.arccos(np.cos(PITCH_ANGLE) * np.cos(YAW_ANGLE))
+
+print("\n", "ANGLE STUFF", "\n" + "*" * 50)
+print(f"Fiber numerical aperture = {NA * (180/np.pi):.2f}°")
+print(f"Total tilt setted = {total_tilt * (180/np.pi):.2f}°")
+print("*" * 50 + "\n")
 
 # --- Grid ---
 axis_ext = AXIS_SIZE * radius
@@ -63,19 +77,23 @@ R = np.sqrt(X**2 + Y**2)
 PHI = np.arctan2(Y, X)
 
 
-E_input = gaussian_electric_field(
+E_input = get_tilted_beam_from_incidence(
     X,
     Y,
-    dA,
-    z=E_IN_Z,
+    z_plane=0,
+    x_incidence=X0,
+    y_incidence=Y0,
+    dist_to_waist=DIST_TO_WAIST,
+    euler_alpha=ROLL_ANGLE,
+    euler_beta=PITCH_ANGLE,
+    euler_gamma=YAW_ANGLE,
+    dA=dA,
     w0_x=W0_X,
     w0_y=W0_Y,
     wavelength=LAMBDA,
-    x0=X0,
-    y0=Y0,
-    theta=THETA,
     polarization_angle=POLARIZATION_ANGLE,
 )
+
 
 guided_modes = []
 coefficients = []
@@ -93,17 +111,7 @@ for l, m in MODES_TO_TEST:
 df_coeff = pd.DataFrame(coefficients)
 df_coeff.set_index(["l", "m"], inplace=True)
 
-
-print("\n" + "*" * 50 + "\n", "SQUARED MODULUS OF COEFFICIENTS", "\n" + "*" * 50)
-print(
-    (np.abs(df_coeff.iloc[:, 2:]) ** 2).to_string(
-        float_format=lambda x: f"{x:.2f}", justify="center", col_space=6
-    )
-)
-print("\n" + "*" * 50 + "\n")
-
-
-# Construct the guided field
+# --- CONSTRUCT THE GUIDED FIELD FROM LP MODES AND COEFFICIENTS ---
 E_guided_x = np.zeros_like(X, dtype=complex)
 E_guided_y = np.zeros_like(X, dtype=complex)
 sq_sum = 0
@@ -137,21 +145,36 @@ I_guided = np.abs(E_guided_x) ** 2 + np.abs(E_guided_y) ** 2
 I_input = np.abs(E_input_x) ** 2 + np.abs(E_input_y) ** 2
 
 P_input_core = np.sum(I_input[R < radius]) * dA
+P_guided_core = np.sum(I_guided[R < radius]) *dA
 P_input = np.sum(I_input) * dA
 P_guided = np.sum(I_guided) * dA
 
 eta = P_guided / P_input if P_input != 0 else 0.0
 
+
+# --- TERMINAL OUTPUT ---
+print("\n", "SQUARED MODULUS OF COEFFICIENTS (%)", "\n" + "*" * 50)
+print(
+    ((np.abs(df_coeff.iloc[:, 2:]) ** 2) * 100).to_string(
+        float_format=lambda x: f"{x:.1f}", justify="center", col_space=6
+    )
+)
+print("*" * 50)
+
+print("\n\n", "SUMMARY", "\n" + "*" * 50)
 print(f"Sum of squared A coeff = {sq_sum:.2f}")
-print(f"P_input on the core = {P_input_core:.3f}")
+print(f"P_input by the core = {P_input_core:.3f}")
+print(f"P_guided by the core = {P_guided_core:.3f}")
 print(f"P_input = {P_input:.2f}")
 print(f"P_guided = {P_guided:.2f}")
 print(f"Coupling efficiency = {eta:.3f}")
+print("*" * 50 + "\n")
 
 
+
+# --- VISUALIZATION ---
 fig, (ax_left, ax) = plt.subplots(1, 2, figsize=(12, 6))
 
-# Use a common color scale for direct comparison
 if NORMALIZE_COLOR_PALETTE:
     vmax = max(np.max(I_input), np.max(I_guided))
 else:
