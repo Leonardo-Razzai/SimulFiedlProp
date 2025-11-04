@@ -1,24 +1,19 @@
 # Optical Fiber LP Mode Projection
 
-This project simulates the coupling of a tilted, elliptical Gaussian beam into a step-index optical fiber. It calculates the fiber's guided Linearly Polarized (LP) modes and uses modal decomposition.
+This project simulates the coupling of a tilted, elliptical Gaussian beam into a step-index optical fiber. It calculates the fiber's guided Linearly Polarized (LP) modes and uses modal decomposition (via overlap integrals) to determine the coupling efficiency and the power distribution among those modes.
 
 ## Core Physics
 
-The simulation is based on the **weakly-guiding approximation** (image below shows the equation).
-
-Inline: ![n_core ≈ n_clad](https://latex.codecogs.com/svg.latex?n_{\text{core}}%20\approx%20n_{\text{clad}})
+The simulation is based on the **weakly-guiding approximation** ![n_core ≈ n_clad](https://latex.codecogs.com/svg.latex?n_{\text{core}}%20\approx%20n_{\text{clad}}) for a step-index fiber.
 
 1.  **Guided Modes:** It finds the guided ![LP_{lm}](https://latex.codecogs.com/svg.latex?LP_{lm}) modes by numerically solving the characteristic equation that arises from applying boundary conditions to the scalar Helmholtz equation. This involves solving transcendental equations for each mode's propagation constant.
 
-2.  **Input Beam:** The input field is modeled as a paraxial Gaussian beam. This beam can be elliptical (![w0x ≠ w0y](https://latex.codecogs.com/svg.latex?w_{0x}%20\neq%20w_{0y})), offset from the fiber axis (![x0,y0](https://latex.codecogs.com/svg.latex?x_0,%20y_0)), and tilted using 3D Euler angles.
+2.  **Input Beam:** The input field is modeled as a paraxial Gaussian beam. This beam can be elliptical (![w0x ≠ w0y](https://latex.codecogs.com/svg.latex?w_{0x}%20\neq%20w_{0y})), offset from the fiber axis (![x0,y0](https://latex.codecogs.com/svg.latex?x_0,%20y_0)), and tilted using 3D Euler angles (roll, pitch, yaw).
 
-3.  **Modal Projection:** The coupling efficiency is determined by projecting the input electric field onto the basis of the guided mode fields. The complex coefficients are:
-
-Block equation:
-
+3.  **Modal Projection:** The coupling efficiency is determined by projecting the input electric field onto the basis of the guided mode fields. The complex coefficients are:<br><br>
 ![c_lm formula](https://latex.codecogs.com/svg.latex?c_{lm}%20=%20\frac{\iint_A%20\mathbf{E}_{\text{in}}(x,y)\cdot\mathbf{E}_{lm}^*(x,y)\,dA}{\iint_A%20|\mathbf{E}_{lm}(x,y)|^2\,dA})
 
-The total guided power is the sum of the power in each mode (proportional to the squared magnitudes of the coefficients).
+The total guided power is the sum of the power in each mode ![P_{lm} prop](https://latex.codecogs.com/svg.latex?(P_{lm}\propto|c_{lm}|^2))
 
 ## File Structure
 
@@ -33,6 +28,15 @@ The total guided power is the sum of the power in each mode (proportional to the
     * `get_guided_modes`: Solves the characteristic equation for a given LP mode.
     * `get_tilted_beam_from_incidence`: Generates the 2D complex electric field for the (potentially tilted) Gaussian beam at the fiber plane.
     * `get_LP_modes_projection_coefficients`: Calculates the overlap integrals and projection coefficients for a single mode.
+
+## Dependencies
+
+This project requires the following Python libraries:
+
+* `numpy`
+* `scipy`
+* `matplotlib`
+* `pandas`
 
 ## How to Use
 
@@ -56,14 +60,6 @@ The total guided power is the sum of the power in each mode (proportional to the
 * `ROLL_ANGLE`, `PITCH_ANGLE`, `YAW_ANGLE`: Euler angles (in radians) to define the beam's tilt.
 * `GRID_SIZE`: The resolution of the simulation grid (e.g., 500 for a 500x500 grid).
 
-## Dependencies
-
-This project requires the following Python libraries:
-
-* `numpy`
-* `scipy`
-* `matplotlib`
-* `pandas`
 
 ## Output
 
@@ -77,4 +73,4 @@ Running the script will:
 
 ## Future Improvements (TODO)
 
-* **Normalize Mode Basis:** The current projection coefficients are calculated relative to the power of each mode. A more standard approach would be to normalize the mode fields so projection coefficients are directly comparable.
+* **Normalize Mode Basis:** The current projection coefficients are calculated relative to the power of each mode (`P_mode`). A more standard approach would be to normalize the mode fields ![E_{lm}](https://latex.codecogs.com/svg.latex?\mathbf{E}_{lm}) themselves. This would make the coefficients ![c_{lm}](https://latex.codecogs.com/svg.latex?c_{lm}) more directly interpretable, as ![|c_{lm}|^2](https://latex.codecogs.com/svg.latex?|c_{lm}|^2) would represent the power coupled into the mode.
